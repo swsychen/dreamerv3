@@ -1,0 +1,10 @@
+cloudpickle
+colored
+google-cloud-pubsub
+gputil
+msgpack
+numpy
+psutil
+ruamel.yaml
+tensorflow-cpu
+zmq
