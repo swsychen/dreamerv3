@@ -11,6 +11,11 @@ class Config(dict):
   IS_PATTERN = re.compile(r'.*[^A-Za-z0-9_.-].*')
 
   def __init__(self, *args, **kwargs):
+    """Initializes itself as a standard dictionary with its contents set to those of self._nested, but with additional methods and properties
+    Here needs to assign the values to the base class dictionary so that conversion to dict `filename.write(json.dumps(dict(self)))` does not lose the content.
+    
+    args, kwargs: the input key-value pairs to be stored in the Config dictionary
+    """
     mapping = dict(*args, **kwargs)
     mapping = self._flatten(mapping)
     mapping = self._ensure_keys(mapping)
@@ -26,6 +31,14 @@ class Config(dict):
     return self._flat.copy()
 
   def save(self, filename):
+    """Saves the configuration to a file in either JSON or YAML format
+
+    Args:
+        filename (str): the path to the file to save the configuration to
+
+    Raises:
+        NotImplementedError: if the file extension is not .json, .yml, or .yaml
+    """
     filename = path.Path(filename)
     if filename.suffix == '.json':
       filename.write(json.dumps(dict(self)))
@@ -51,6 +64,17 @@ class Config(dict):
       raise NotImplementedError(filename.suffix)
 
   def __contains__(self, name):
+    """overriding the __contains__ method to allow for nested dictionary access using the SEP as a separator
+
+    Usage:
+        `'key1.key2.key3' in self `will return True if the key3 is in the nested dictionary of key2 in the nested dictionary of key1
+
+    Args:
+        name (str): key that may contain the SEP as a separator
+
+    Returns:
+        boolean: True if the key is in the dictionary, False otherwise
+    """
     try:
       self[name]
       return True
@@ -66,6 +90,20 @@ class Config(dict):
       raise AttributeError(name)
 
   def __getitem__(self, name):
+    """overriding the __getitem__ method to allow for nested dictionary access using the SEP as a separator
+    
+    Usage:
+        `self['key1.key2.key3']` will return the value of the key3 in the nested dictionary of key2 in the nested dictionary of key1
+    
+    Args:
+        name (str): key that may contain the SEP as a separator
+
+    Raises:
+        KeyError: if the key is not found in the dictionary
+
+    Returns:
+        Optional: the value of the key in the dictionary, it will be converted to a Config dict object if it is a dict
+    """
     result = self._nested
     for part in name.split(self.SEP):
       try:
@@ -132,6 +170,15 @@ class Config(dict):
     return type(self)(result)
 
   def _flatten(self, mapping):
+    """flatten the nested dictionary into a single level dictionary and change the keys with their relative paths,
+    more efficient to lookup, check and modification than the recursive version
+
+    Args:
+        mapping (dict): input nested dictionary
+
+    Returns:
+        dict: flattened dictionary
+    """
     result = {}
     for key, value in mapping.items():
       if isinstance(value, dict):
@@ -146,6 +193,14 @@ class Config(dict):
     return result
 
   def _nest(self, mapping):
+    """re-nest the flattened dictionary into a nested dictionary according to the SEP in the keys
+
+    Args:
+        mapping (dict): flattened dictionary
+
+    Returns:
+        dict: re-nested dictionary
+    """
     result = {}
     for key, value in mapping.items():
       parts = key.split(self.SEP)
@@ -158,11 +213,34 @@ class Config(dict):
     return result
 
   def _ensure_keys(self, mapping):
+    """ensure that the keys in the (flattened) mapping do not contain any non-alphanumeric characters,
+    usually used after self._flatten()
+
+    Args:
+        mapping (dict): input dictionary
+
+    Returns:
+        dict: input dictionary
+    """
     for key in mapping:
       assert not self.IS_PATTERN.match(key), key
     return mapping
 
   def _ensure_values(self, mapping):
+    """ensure that the values in the (flattened) mapping are of the correct type and format.
+     all lists will be converted to tuples, and tuples will be checked for type consistency (must be all of the same type from strings, floats, ints, bools)
+
+    Args:
+        mapping (dict): input dictionary
+
+    Raises:
+        TypeError: no empty lists allowed
+        TypeError: lists can only contain strings, floats, ints, bools
+        TypeError: elements of a list must all be of the same type
+
+    Returns:
+        dict: a deep copy of the input dictionary with lists becoming tuples, the original dictionary is not modified
+    """
     result = json.loads(json.dumps(mapping))
     for key, value in result.items():
       if isinstance(value, list):

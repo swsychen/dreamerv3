@@ -12,20 +12,39 @@ class Path:
   filesystems = []
 
   def __new__(cls, path):
-    if cls is not Path:
-      return super().__new__(cls)
+    """__new__ is responsible for actually creating the instance, before __init__ is called. It's a class method that returns a new instance of the class cls. 
+    The first argument is the class itself (cls), and the rest of the arguments are the same as the arguments to the __init__ method. 
+    __new__ is used when you need to control the creation of a new instance. One common use of __new__ is to create a singleton class, where only one instance of the class is ever created.
+
+    Args:
+        path (str): the path to be stored in the Path object
+
+    Raises:
+        NotImplementedError: if path not supported by any filesystem TODO: what is a filesystem?
+
+    Returns:
+        obj: a new instance of the class cls
+    """
+    if cls is not Path:           # if the class cls is a subclass of Path,
+      return super().__new__(cls) # create a new instance of the class cls.
     path = str(path)
-    for impl, pred in cls.filesystems:
-      if pred(path):
+    for impl, pred in cls.filesystems:   # iterate over the filesystems (GFilePath, LocalPath) and their predicates (lambda path: path.startswith('gs://'), lambda path: True
+      if pred(path):                      # if the path is supported, return a new instance of the class impl
         obj = super().__new__(impl)
-        obj.__init__(path)
-        return obj
+        obj.__init__(path)    # Here it is unnecessary to call __init__ explicitly, as it is called automatically after __new__ returns the new instance. This line will make the initialization happen twice.
+        return obj 
     raise NotImplementedError(f'No filesystem supports: {path}')
 
   def __getnewargs__(self):
     return (self._path,)
 
   def __init__(self, path):
+    """initializes the Path object, containing methods for path management, the input path will be modified to remove leading dots or leading dot slashes and single trailing slash.
+    And empty path will be represented by a dot.
+    
+    Args:
+        path (str): the path to be stored in the Path object
+    """
     assert isinstance(path, str)
     path = re.sub(r'^\./*', '', path)  # Remove leading dot or dot slashes.
     path = re.sub(r'(?<=[^/])/$', '', path)  # Remove single trailing slash.
@@ -53,9 +72,15 @@ class Path:
 
   @property
   def parent(self):
-    if '/' not in self._path:
+    """returns the parent directory of the path, if the path does not contain a slash, it returns the current directory "."
+     if the path is a root directory, it returns the root directory "/"
+
+    Returns:
+        obj: a new instance of the class with the parent directory as the path input
+    """
+    if '/' not in self._path:   
       return type(self)('.')
-    parent = self._path.rsplit('/', 1)[0]
+    parent = self._path.rsplit('/', 1)[0]   # splitting beginning from the right, and do only one split, effectively returning the parent directory with [0]
     parent = parent or ('/' if self._path.startswith('/') else '.')
     return type(self)(parent)
 
