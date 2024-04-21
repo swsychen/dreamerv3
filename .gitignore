@@ -7,4 +7,5 @@ MUJOCO_LOG.TXT
 .vscode/
 embodied/dmlab_data/
 embodied/scripts/lab/
+logs/
 ;

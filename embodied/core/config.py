@@ -145,29 +145,40 @@ class Config(dict):
     return '\n'.join(lines)
 
   def update(self, *args, **kwargs):
-    result = self._flat.copy()
-    inputs = self._flatten(dict(*args, **kwargs))
+    """update the config dict with new key-value pairs from the input args and kwargs, here will also check the value type consistency and convert the value to the old value type.
+    The key to be updated must exist in the config dict.
+
+    Raises:
+        KeyError: if no keys are found in pattern match or is empty, raise error
+        ValueError: if the new value is a fractional float and the old value is an int, raise error
+        TypeError: if the new value cannot be converted to the old value type, raise error
+
+    Returns:
+        Config obj: a new Config object with the updated values and other values unchanged
+    """
+    result = self._flat.copy()       # make a copy of the flattened config dict
+    inputs = self._flatten(dict(*args, **kwargs))    # flatten the input dict
     for key, new in inputs.items():
       if self.IS_PATTERN.match(key):
         pattern = re.compile(key)
-        keys = {k for k in result if pattern.match(k)}
+        keys = {k for k in result if pattern.match(k)}   #TODO: I think should be fullmatch instead of match, unknown author's intention about the non-alphanumeric characters
       else:
         keys = [key]
-      if not keys:
+      if not keys:        # if no keys are found in pattern match, raise error
         raise KeyError(f'Unknown key or pattern {key}.')
       for key in keys:
-        old = result[key]
-        try:
+        old = result[key]  #if key not found, will get KeyError
+        try:              # Here repeat again the type checking and conversion, as in _parse_flag_value()
           if isinstance(old, int) and isinstance(new, float):
             if float(int(new)) != new:
               message = f"Cannot convert fractional float {new} to int."
               raise ValueError(message)
-          result[key] = type(old)(new)
+          result[key] = type(old)(new)         # replace the old value with the new value
         except (ValueError, TypeError):
           raise TypeError(
               f"Cannot convert '{new}' to type '{type(old).__name__}' " +
               f"for key '{key}' with previous value '{old}'.")
-    return type(self)(result)
+    return type(self)(result)   # return a new Config object with the updated values
 
   def _flatten(self, mapping):
     """flatten the nested dictionary into a single level dictionary and change the keys with their relative paths,

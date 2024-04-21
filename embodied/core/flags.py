@@ -22,14 +22,14 @@ class Flags:
     return parsed
 
   def parse_known(self, argv=None, help_exits=False):
-    """_summary_
+    """[parse argv and update config] parse the command line arguments and update the config with the parsed arguments.
 
     Args:
         argv (list, optional): arguments. Defaults to None.
         help_exits (bool, optional): whether exit after printing help info when querying for help using "--help". Defaults to False.
 
     Returns:
-        tuple: (dict, list) of parsed arguments and remaining arguments (single values without keys specified)
+        tuple: (Config obj, list) of updated config dict and remaining arguments (like single values without keys specified, or non-exist keys in config...)
     """
     if argv is None:
       argv = sys.argv[1:]        # read the command line arguments if argv is None
@@ -57,12 +57,12 @@ class Flags:
         else:
           remaining.append(arg)   # extract the single value without key specified and add it to the remaining list
     self._submit_entry(key, vals, parsed, remaining)   # submit the last key and values to the parsed dictionary 
-    parsed = self._config.update(parsed)
+    parsed = self._config.update(parsed)   # update the config with the parsed dictionary (have new values from command line)
     return parsed, remaining
 
   def _submit_entry(self, key, vals, parsed, remaining):
-    """to check if the key is in the config, and overwrite the default value in the config with the values submitted, then add the key-value pair to the parsed dictionary.
-    Unless the key ends with '+', in which case the values will be appended to the default value.
+    """[check key, add/replace value] to check if the key is in the config, and overwrite the default value in the config with the values submitted, then add the key-value pair to the parsed dictionary.
+    Unless the key ends with '+', in which case the values will be appended to the default value. If there is no match of the key in the config/ key or value is None/ have "=" in key, the key (or/and) values will be added to the remaining list.
 
     Args: 
         key (str): the key to be submitted
@@ -109,13 +109,32 @@ class Flags:
       else:
         remaining.extend([key] + vals)     # if the key is not present in the config, add the key and values as items to the remaining list
     elif name in self._config:
-      # Here it will overwrite the default value in the config
+      # Here it will not use/ overwrite the default value in the config
       key = name
       parsed[key] = self._parse_flag_value(self._config[key], vals, key)
     else:
       remaining.extend([key] + vals)      # if key has no match in the config
 
   def _parse_flag_value(self, default, value, key):
+    """[check value, convert value] check if the value represents the same type as the default value for boolean, integer default types. Convert the value to the default value type for these scenarios and other types.
+    It can handle intended multiple values for a key, but it needs to be a single-item list like ['value1, value2, ...'], where the values are separated by commas.
+    In this function, it doesn't decide whether to replace the default value with the submitted value, but only convert the submitted val from string to the matched type, preparing for the subsequent decision-making or other process.
+
+    Args:
+        default (tuple/item): the default value of the key in the config
+        value (list): a list of values to be submitted, should be a single-item list like ['value'] or ['value1, value2, ...']
+        key (str): the key to be submitted
+
+    Raises:
+        TypeError: if more than one item in value list is simultaneously present for a key 
+        TypeError: if the value is not 'False' or 'True' for a boolean default value
+        TypeError: if the value cannot be converted / is not the int type for an integer default value
+        KeyError: if the default value is a dictionary
+        TypeError: if the value cannot be converted to the type of the default value
+
+    Returns:
+        tuple/item: the converted value, which is the same type as the default value. tuple if it is multiple-values case, single item if it is a single value
+    """
     value = value if isinstance(value, (tuple, list)) else (value,)
     if isinstance(default, (tuple, list)):
       if len(value) == 1 and ',' in value[0]:           # seperately handle the value with commas, treat each substring between commas as a separate value for the same key
@@ -126,26 +145,26 @@ class Flags:
           f"Expected a single value for key '{key}' but got: {value}")
     value = str(value[0])
     if default is None:
-      return value
+      return value              # use the submitted value if default is None
     if isinstance(default, bool):
       try:
-        return bool(['False', 'True'].index(value))
-      except ValueError:
+        return bool(['False', 'True'].index(value)) # to find the index of the string value in the list ['False', 'True'].---> value: 'False'->0, 'True'->1
+      except ValueError:                # if value is not 'False' or 'True', raise error
         message = f"Expected bool but got '{value}' for key '{key}'."
         raise TypeError(message)
     if isinstance(default, int):
       try:
         value = float(value)  # Allow scientific notation for integers.
-        assert float(int(value)) == value
+        assert float(int(value)) == value       # make sure the value is an integer if default is an integer
       except (ValueError, TypeError, AssertionError):
         message = f"Expected int but got '{value}' for key '{key}'."
         raise TypeError(message)
       return int(value)
-    if isinstance(default, dict):
+    if isinstance(default, dict):    # if default is a dictionary, raise error
       raise KeyError(
           f"Key '{key}' refers to a whole dict. Please speicfy a subkey.")
     try:
-      return type(default)(value)
+      return type(default)(value)     # convert the value to the type of the default value
     except ValueError:
       raise TypeError(
           f"Cannot convert '{value}' to type '{type(default).__name__}' for "

@@ -2,9 +2,9 @@ class Singleton:
     _instance = None  # Class attribute to store the singleton instance
     _is_initialized = False  # Class attribute to store the initialization state
     def __new__(cls):
-        if cls._instance is None:
-            print("Creating the instance")
-            cls._instance = super(Singleton, cls).__new__(cls)
+        # if cls._instance is None:
+        #     print("Creating the instance")
+        cls._instance = super(Singleton, cls).__new__(cls)
         return cls._instance
 
     def __init__(self):
@@ -71,3 +71,6 @@ print(sss.split('=', 1))
 IS_PATTERN = re.compile(r'.*[^A-Za-z0-9_.-].*')
 name = "abc"
 print(IS_PATTERN.fullmatch(name))
+
+trydict = {'a': 1, 'b': 2, 'c': 3}
+x=trydict['d']
