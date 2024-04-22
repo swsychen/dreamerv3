@@ -7,7 +7,15 @@ import numpy as np
 
 
 def train(make_agent, make_replay, make_env, make_logger, args):
+  """_summary_
 
+  Args:
+      make_agent (_type_): _description_
+      make_replay (_type_): _description_
+      make_env (_type_): _description_
+      make_logger (_type_): _description_
+      args (_type_): _description_
+  """
   agent = make_agent()
   replay = make_replay()
   logger = make_logger()

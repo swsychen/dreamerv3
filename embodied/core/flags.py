@@ -7,22 +7,36 @@ from . import config
 class Flags:
 
   def __init__(self, *args, **kwargs):
-    """TODO: seems to store the default config
+    """store the config, as a high-level interface to the config.Config class for parsing command line arguments. and updating the config with the parsed arguments.
     """
     self._config = config.Config(*args, **kwargs)
 
   def parse(self, argv=None, help_exits=True):
+    """[process argv ,get new config and error for unknown key] process the command line arguments and get the new config with the parsed arguments.
+
+    Args:
+        argv (list, optional): arguments to be submitted. Defaults to None.
+        help_exits (bool, optional): <not used in code>, should be used for whether exit after printing help info when querying for help using "--help". Defaults to True.
+
+    Raises:
+        KeyError: the key flag did not match any config keys
+        ValueError: could not parse all arguments, remaining arguments list is not empty
+
+    Returns:
+        Config obj (a custom dict type): updated config dict with the parsed arguments
+    """
     parsed, remaining = self.parse_known(argv)
-    for flag in remaining:
-      if flag.startswith('--') and flag[2:] not in self._config.flat:
+    for flag in remaining:         
+      if flag.startswith('--') and flag[2:] not in self._config.flat:  # it it is a key and not in the config, raise error
         raise KeyError(f"Flag '{flag}' did not match any config keys.")
-    if remaining:
+    if remaining:        # if remaining list it not empty, raise error
       raise ValueError(
           f'Could not parse all arguments. Remaining: {remaining}')
     return parsed
 
   def parse_known(self, argv=None, help_exits=False):
-    """[parse argv and update config] parse the command line arguments and update the config with the parsed arguments.
+    """[parse argv ,update config, no error for unknown key] parse the command line arguments and update the config with the parsed arguments. If input argv is None, it will read the system command line arguments. 
+    If '--help' is in the arguments, it will print the help message and exit if help_exits is True.
 
     Args:
         argv (list, optional): arguments. Defaults to None.
@@ -33,7 +47,7 @@ class Flags:
     """
     if argv is None:
       argv = sys.argv[1:]        # read the command line arguments if argv is None
-    if '--help' in argv:         # TODO:print the help message (where in the self._config?) and exit if --help is in argv, exit if help_exists is True
+    if '--help' in argv:         # print the help message (the config dict in rows of string format) and exit if --help is in argv, exit if help_exists is True
       print('\nHelp:')
       lines = str(self._config).split('\n')[2:]
       print('\n'.join('--' + re.sub(r'[:,\[\]]', '', x) for x in lines)) # printing, begin new line with '--' and remove colons, commas, and square brackets from each line x
@@ -50,7 +64,7 @@ class Flags:
           key, val = arg.split('=', 1)    #split from left, only once
           vals = [val]
         else:
-          key, vals = arg, []
+          key, vals = arg, []         # all vals will be in a list
       else:
         if key:
           vals.append(arg)

@@ -8,4 +8,5 @@ MUJOCO_LOG.TXT
 embodied/dmlab_data/
 embodied/scripts/lab/
 logs/
+example.txt
 ;

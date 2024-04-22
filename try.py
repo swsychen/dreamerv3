@@ -73,4 +73,53 @@ name = "abc"
 print(IS_PATTERN.fullmatch(name))
 
 trydict = {'a': 1, 'b': 2, 'c': 3}
-x=trydict['d']
+x=trydict['a']
+# print(trydict.a)
+
+string_withplace = "Hello {name}, welcome to {place}"
+print(string_withplace.format(name="John", place="New York"))
+
+print(r"\_")
+
+class myclass:
+    __slots__ = ['a', 'b']
+    def __init__(self):
+        self.a = 1
+        self.b = 2
+        # self.c = 3 it will raise an error because c is not in __slots__
+    def __getitem__(self, key):
+        return getattr(self, key)
+
+obj = myclass()
+print(obj['a'])
+print(obj.a)
+obj.a=3      # can modify the attribute
+print(obj['a'])
+
+from collections import defaultdict
+a=defaultdict(myclass)
+print(a['1'])
+print(int())
+
+
+import contextlib
+
+@contextlib.contextmanager
+def open_file(path, mode):
+    f = open(path, mode)
+    try:            #using return instead of yield will cause an error
+        yield f   # temporarily return the file object to the caller, will continue after the outer block is finished
+    finally:      # Ensure the file is always closed under all circumstances, even exceptions or errors occur
+        f.close()  # try-except will also work here, but need to specify the exception type
+
+@contextlib.contextmanager
+def open_file2(path, mode):
+    with open(path, mode) as f:
+        print("File opened")
+        #return f  # must use yield here, otherwise the file will be closed before the caller can use it, causing an error
+        yield f
+# Usage
+with open_file2("example.txt", "w") as file:
+    file.write("Hello, world!")
+    # raise Exception("An error occurred while writing to the file")
+# The file is automatically closed here.

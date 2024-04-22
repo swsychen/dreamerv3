@@ -7,7 +7,10 @@ import shutil
 
 class Path:
 
-  __slots__ = ('_path',)
+  # Use __slots__ to statically define memory structure of class instances.
+  # This restricts instance attributes to only '_path', saving memory by avoiding the creation of __dict__ for each instance.
+  # This results in faster attribute access and reduced memory use, but limits ability to add new attributes dynamically and use weak references unless explicitly handled.
+  __slots__ = ('_path',)      
 
   filesystems = []
 
@@ -20,7 +23,7 @@ class Path:
         path (str): the path to be stored in the Path object
 
     Raises:
-        NotImplementedError: if path not supported by any filesystem TODO: what is a filesystem?
+        NotImplementedError: if path not supported by any filesystem (local or Google cloud storage)
 
     Returns:
         obj: a new instance of the class cls
@@ -29,7 +32,7 @@ class Path:
       return super().__new__(cls) # create a new instance of the class cls.
     path = str(path)
     for impl, pred in cls.filesystems:   # iterate over the filesystems (GFilePath, LocalPath) and their predicates (lambda path: path.startswith('gs://'), lambda path: True
-      if pred(path):                      # if the path is supported, return a new instance of the class impl
+      if pred(path):                      # if the path is supported, return a new instance of the class impl (GFilePath or LocalPath)
         obj = super().__new__(impl)
         obj.__init__(path)    # Here it is unnecessary to call __init__ explicitly, as it is called automatically after __new__ returns the new instance. This line will make the initialization happen twice.
         return obj 
@@ -52,6 +55,15 @@ class Path:
     self._path = path
 
   def __truediv__(self, part):
+    """overloads the division operator to concatenate the path with the input part, and returns a new instance of the class with the new path.
+    It will automatically decide whether to add a slash "/" between them.
+
+    Args:
+        part (str): the part to be concatenated to the end of the path
+
+    Returns:
+        Path: a new instance of the class with the concatenated path
+    """
     sep = '' if self._path.endswith('/') else '/'
     return type(self)(f'{self._path}{sep}{str(part)}')
 
@@ -68,6 +80,11 @@ class Path:
     return self._path < other._path
 
   def __str__(self):
+    """returns the path stored in the Path object if called like str(Path)
+
+    Returns:
+        str: stored path
+    """
     return self._path
 
   @property
@@ -149,10 +166,24 @@ class LocalPath(Path):
   __slots__ = ('_path',)
 
   def __init__(self, path):
-    super().__init__(os.path.expanduser(str(path)))
+    super().__init__(os.path.expanduser(str(path)))   #expand the user's home directory in the path, from ~ to /home/username
 
   @contextlib.contextmanager
   def open(self, mode='r'):
+    """opens the file in the path in read mode, and yields the file handler. 
+    This file handler to the outer block is temporary and meantime the inner block will be suspended at yield, and will continue after the outer block is finished.
+    Here after the outer block is finished, the file handler will be closed automatically because the inner 'with' block is exited. 
+
+    Usage:
+        with path.open('r') as f:
+            content = f.read()
+
+    Args:
+        mode (str, optional): _description_. Defaults to 'r'.
+
+    Yields:
+        FileHandler: a file handler for further operations
+    """
     with open(str(self), mode=mode) as f:
       yield f
 

@@ -11,7 +11,8 @@ class Config(dict):
   IS_PATTERN = re.compile(r'.*[^A-Za-z0-9_.-].*')
 
   def __init__(self, *args, **kwargs):
-    """Initializes itself as a standard dictionary with its contents set to those of self._nested, but with additional methods and properties
+    """Initializes itself as a standard dictionary with its contents set to those of self._nested, but with additional methods and properties (avoid direct overwrite of attribute and key-value pairs, direct value query per config.key or config['key'] with possible SEP seperator)
+    
     Here needs to assign the values to the base class dictionary so that conversion to dict `filename.write(json.dumps(dict(self)))` does not lose the content.
     
     args, kwargs: the input key-value pairs to be stored in the Config dictionary
@@ -82,6 +83,17 @@ class Config(dict):
       return False
 
   def __getattr__(self, name):
+    """overriding the __getattr__ method to access items using the dot notation, e.g. `config.key` or config.get('key')
+
+    Args:
+        name (str): the key to be found
+
+    Raises:
+        AttributeError: if the key is not found in the dictionary, raise error
+
+    Returns:
+        Optional: the value of the key in the dictionary, it will be converted to a Config dict object if it is a dict. It will further go deeper into the new Config dict (key1's) if the key is like 'config.key1.key2.key3' 
+    """
     if name.startswith('_'):
       return super().__getattr__(name)
     try:
@@ -115,12 +127,36 @@ class Config(dict):
     return result
 
   def __setattr__(self, key, value):
+    """ONLY allow direct setting value of attribute that start with an underscore (private attribute), otherwise raise an AttributeError
+
+    Args:
+        key (str): the attribute name to be found
+        value (Optional): the value of it to be set
+
+    Raises:
+        AttributeError: if the key does not start with an underscore (private attribute), raise error
+
+    Returns:
+        None: None
+    """
     if key.startswith('_'):
       return super().__setattr__(key, value)
     message = f"Tried to set key '{key}' on immutable config. Use update()."
     raise AttributeError(message)
 
   def __setitem__(self, key, value):
+    """ONLY allow direct setting value of key in the config dict that start with an underscore (private key), otherwise raise an AttributeError
+
+    Args:
+        key (str): the key to be found
+        value (Optional): the value of it to be set
+
+    Raises:
+        AttributeError: if the key does not start with an underscore (private key), raise error
+
+    Returns:
+        None: None
+    """
     if key.startswith('_'):
       return super().__setitem__(key, value)
     message = f"Tried to set key '{key}' on immutable config. Use update()."
@@ -130,6 +166,11 @@ class Config(dict):
     return (type(self), (dict(self),))
 
   def __str__(self):
+    """turn the config dict into rows of key-value pairs with the type of the value in parentheses
+
+    Returns:
+        str: the formatted string of the config dict in rows
+    """
     lines = ['\nConfig:']
     keys, vals, typs = [], [], []
     for key, val in self.flat.items():
@@ -252,7 +293,7 @@ class Config(dict):
     Returns:
         dict: a deep copy of the input dictionary with lists becoming tuples, the original dictionary is not modified
     """
-    result = json.loads(json.dumps(mapping))
+    result = json.loads(json.dumps(mapping))      # deep copy the input dictionary
     for key, value in result.items():
       if isinstance(value, list):
         value = tuple(value)
@@ -271,6 +312,14 @@ class Config(dict):
     return result
 
   def _format_value(self, value):
+    """put the value into a string format with ['value1, value2, ...'] for lists and tuples
+
+    Args:
+        value (item/list/tuple): the value to be formatted into a string
+
+    Returns:
+        str: the formatted string of the value
+    """
     if isinstance(value, (list, tuple)):
       return '[' + ', '.join(self._format_value(x) for x in value) + ']'
     return str(value)

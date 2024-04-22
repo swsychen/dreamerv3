@@ -176,6 +176,8 @@ size400m: &size400m
   .*\.depth: 96
   .*\.units: 1536
 
+# <<<Attention>>>> the config.task need to be in the format '{suite}_{task}'
+
 minecraft:
   task: minecraft_diamond
   run:
@@ -190,7 +192,7 @@ dmlab:
   run:
     steps: 2.6e7
 
-atari:
+atari:     
   task: atari_pong
   env.atari.size: [96, 96]
   (enc|dec).simple.minres: 6
