@@ -185,7 +185,7 @@ def make_env(config, index, **overrides):
   """Create an environment from the config.
 
   Args:
-      config (_type_): _description_
+      config (Config dict): _description_
       index (_type_): _description_
 
   Returns:

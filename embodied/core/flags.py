@@ -43,7 +43,7 @@ class Flags:
         help_exits (bool, optional): whether exit after printing help info when querying for help using "--help". Defaults to False.
 
     Returns:
-        tuple: (Config obj, list) of updated config dict and remaining arguments (like single values without keys specified, or non-exist keys in config...)
+        tuple: (Config obj (dict), list) of updated config dict and remaining arguments (like single values without keys specified, or non-exist keys in config...)
     """
     if argv is None:
       argv = sys.argv[1:]        # read the command line arguments if argv is None

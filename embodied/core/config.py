@@ -195,7 +195,7 @@ class Config(dict):
         TypeError: if the new value cannot be converted to the old value type, raise error
 
     Returns:
-        Config obj: a new Config object with the updated values and other values unchanged
+        Config obj (dict): a new Config object with the updated values and other values unchanged
     """
     result = self._flat.copy()       # make a copy of the flattened config dict
     inputs = self._flatten(dict(*args, **kwargs))    # flatten the input dict
