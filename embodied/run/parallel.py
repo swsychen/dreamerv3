@@ -110,6 +110,7 @@ def parallel_learner(agent, barrier, args):
   should_log = embodied.when.Clock(args.log_every)
   should_eval = embodied.when.Clock(args.eval_every)
   should_save = embodied.when.Clock(args.save_every)
+  batch_steps = args.batch_size * (args.batch_length - args.replay_context)
   fps = embodied.FPS()
 
   checkpoint = embodied.Checkpoint(logdir / 'checkpoint.ckpt')
@@ -154,7 +155,7 @@ def parallel_learner(agent, barrier, args):
         updater.update(outs['replay'])
     time.sleep(0.0001)
     agg.add(mets)
-    fps.step(batch['is_first'].size)
+    fps.step(batch_steps)
 
     if should_eval():
       with embodied.timer.section('learner_eval'):
@@ -349,7 +350,7 @@ def parallel_env(make_env, envid, args, logging=False):
 
     with embodied.timer.section('env_step'):
       obs = env.step(act)
-    obs = {k: np.asarray(v) for k, v in obs.items()}
+    obs = {k: np.ascontiguousarray(v) for k, v in obs.items()}
     score += obs['reward']
     length += 1
     fps.step(1)

@@ -27,24 +27,25 @@ def main(argv=None):
   embodied.print(r"--- |___/|_| \___\__,_|_|_|_\___|_|  \_/ |___/ ---")
 
   from . import agent as agt
+
   # 1.1-- Parse and update env/task argument first, other arguments are updated later (stored in 'other')
   parsed, other = embodied.Flags(configs=['defaults']).parse_known(argv)
-  
+
   # 1.2-- Load default config (has all needed general+model+default_env hyperparams) from `agt.Agent.configs`, which also has all other env configs.
   config = embodied.Config(agt.Agent.configs['defaults'])
-  
+
   # 1.3-- Update user-assigned env/task with their properties to the config
   for name in parsed.configs:
     config = config.update(agt.Agent.configs[name])
   
   # 1.4-- Update other arguments to the config
-  config = embodied.Flags(config).parse(other)  # any extra positional arguments (here:config) provided during the function call are collected into a tuple named args-->(config,)
+  config = embodied.Flags(config).parse(other)
   config = config.update(
-      logdir=config.logdir.format(timestamp=embodied.timestamp()))    # if logdif has placeholder {timestamp}, replace it with current timestamp
+      logdir=config.logdir.format(timestamp=embodied.timestamp()))
   
   # 1.5-- Extract a runtime config from the config
   args = embodied.Config(
-      **config.run,        # **config.run will into kwargs. If using config.run, it will into args as a tuple, but results (the combined dict) are same
+      **config.run,
       logdir=config.logdir,
       batch_size=config.batch_size,
       batch_length=config.batch_length,
@@ -55,19 +56,19 @@ def main(argv=None):
 
   # 1.6-- Create a LocalPath/GPath object from the logdir for managing path-related operations
   logdir = embodied.Path(args.logdir)
-  if args.script not in ('env', 'replay'):   # if script is 'train' or 'train_xxx' ..., create new dir and save the config in the dir
+  if args.script not in ('env', 'replay'):
     logdir.mkdir()
     config.save(logdir / 'config.yaml')
 
   # TODO: timer and multiprocessing
   def init():
     embodied.timer.global_timer.enabled = args.timer
-  embodied.distr.Process.initializers.append(init)   # add to the class definition
+  embodied.distr.Process.initializers.append(init)
   init()
 
   if args.script == 'train':
     embodied.run.train(
-        bind(make_agent, config),    #the first argument is pre-filled with config
+        bind(make_agent, config),
         bind(make_replay, config, 'replay'),
         bind(make_env, config),
         bind(make_logger, config), args)
@@ -196,7 +197,7 @@ def make_env(config, index, **overrides):
     from embodied.envs import from_gym
     import memory_maze  # noqa
   ctor = {
-      'dummy': 'embodied.envs.dummy:Dummy',  # It means that in the module at embodied.envs.dummy, there is a class (or a function) named Dummy
+      'dummy': 'embodied.envs.dummy:Dummy',       # It means that in the module at embodied.envs.dummy, there is a class (or a function) named Dummy
       'gym': 'embodied.envs.from_gym:FromGym',
       'dm': 'embodied.envs.from_dmenv:FromDM',
       'crafter': 'embodied.envs.crafter:Crafter',
@@ -212,24 +213,24 @@ def make_env(config, index, **overrides):
       'bsuite': 'embodied.envs.bsuite:BSuite',
       'memmaze': lambda task, **kw: from_gym.FromGym(
           f'MemoryMaze-{task}-ExtraObs-v0', **kw),
-  }[suite]                            # extract the env constructor from the suite
+  }[suite]                          # extract the env constructor from the suite
   if isinstance(ctor, str):          # typical usage of ctor "module:classname"
     module, cls = ctor.split(':')
-    module = importlib.import_module(module)   
+    module = importlib.import_module(module)
     ctor = getattr(module, cls)     # get the env class, here cannout use module.cls directly, because cls is a string, same for the previous line
-  kwargs = config.env.get(suite, {})  # get the specific env config from the all config
-  kwargs.update(overrides)           # update the env config with the overrides if exists
-  if kwargs.pop('use_seed', False):     # pop the key. If not exists, return False
-    kwargs['seed'] = hash((config.seed, index)) % (2 ** 32 - 1)   #  generate a deterministic, yet unique, seed value based on the combination of a global seed and an index. Also reproducible for the same global seed and index
+  kwargs = config.env.get(suite, {})   # get the specific env config from the all config
+  kwargs.update(overrides)        # update the env config with the overrides if exists
+  if kwargs.pop('use_seed', False):         # pop the key. If not exists, return False
+    kwargs['seed'] = hash((config.seed, index)) % (2 ** 32 - 1)      #  generate a deterministic, yet unique, seed value based on the combination of a global seed and an index. Also reproducible for the same global seed and index
   if kwargs.pop('use_logdir', False):
-    kwargs['logdir'] = embodied.Path(config.logdir) / f'env{index}'  # append the index to the end of logdir path---> a new sub logdir for the env index
+    kwargs['logdir'] = embodied.Path(config.logdir) / f'env{index}'   # append the index to the end of logdir path---> a new sub logdir for the env index
   env = ctor(task, **kwargs)
   return wrap_env(env, config)
 
 # TODO: need to figure out how the multi-threading works for the environment (atari and minecraft)
 
 def wrap_env(env, config):
-  args = config.wrapper    # the wrapper dict will also be output as a Config object (dict)
+  args = config.wrapper        # the wrapper dict will also be output as a Config object (dict)
   for name, space in env.act_space.items():
     if name == 'reset':
       continue

@@ -157,8 +157,9 @@ class Replay:
           priority.flatten())
     if data:
       for i, stepid in enumerate(stepid):
-        chunkid = embodied.uuid(stepid[0].tobytes()[:-4])
-        index = int.from_bytes(stepid[0].tobytes()[-4:], 'big')
+        stepid = stepid[0].tobytes()
+        chunkid = embodied.uuid(stepid[:-4])
+        index = int.from_bytes(stepid[-4:], 'big')
         values = {k: v[i] for k, v in data.items()}
         try:
           self._setseq(chunkid, index, values)
@@ -189,7 +190,7 @@ class Replay:
       except KeyError:
         continue
 
-  def _insert(self, chunkid, index):
+  def _insert(self, chunkid, index, loading=False):
     while self.capacity and len(self.items) >= self.capacity:
       self._remove()
     itemid = self.itemid
@@ -198,7 +199,8 @@ class Replay:
     stepids = self._getseq(chunkid, index, ['stepid'])['stepid']
     self.sampler[itemid] = stepids
     self.fifo.append(itemid)
-    self.limiter.insert()
+    if not loading:
+      self.limiter.insert()
 
   def _remove(self):
     self.limiter.remove()
@@ -265,13 +267,13 @@ class Replay:
       seqs, is_online = zip(*[self._sample() for _ in range(batch)])
       if not length or length == self.length:
         data = self._assemble_batch(seqs, 0, self.length)
-        data = self._annotate_batch(data, is_online)
+        data = self._annotate_batch(data, is_online, is_first=True)
         yield data
       else:
         assert length <= self.length, (length, self.length)
         for t in range(0, self.length - self.length % length, length):
           data = self._assemble_batch(seqs, t, t + length)
-          data = self._annotate_batch(data, is_online)
+          data = self._annotate_batch(data, is_online, is_first=(t == 0))
           yield data
 
   @embodied.timer.section('assemble_batch')
@@ -297,14 +299,15 @@ class Replay:
     return data
 
   @embodied.timer.section('annotate_batch')
-  def _annotate_batch(self, data, is_online):
+  def _annotate_batch(self, data, is_online, is_first):
     data = data.copy()
     if self.online:
       broadcasted = [[x] for x in is_online]
       data['is_online'] = np.full(data['is_first'].shape, broadcasted, bool)
     if 'is_first' in data:
-      data['is_first'] = data['is_first'].copy()
-      data['is_first'][:, 0] = True
+      if is_first:
+        data['is_first'] = data['is_first'].copy()
+        data['is_first'][:, 0] = True
       if 'is_last' in data:
         # Make sure that abandoned episodes have is_last set.
         next_is_first = np.roll(data['is_first'], shift=-1, axis=1)
@@ -314,24 +317,24 @@ class Replay:
 
   @embodied.timer.section('replay_save')
   def save(self):
-    if not self.directory:
-      return
-    with self.rwlock.writing:
-      for worker, (chunkid, _) in self.current.items():
-        chunk = self.chunks[chunkid]
-        if chunk.length > 0:
-          self._complete(chunk, worker)
-      promises = []
-      for chunk in self.chunks.values():
-        if chunk.length > 0 and chunk.uuid not in self.saved:
-          self.saved.add(chunk.uuid)
-          promises.append(self.workers.submit(chunk.save, self.directory))
-      if self.debug_save_wait:
-        [promise.result() for promise in promises]
+    if self.directory:
+      with self.rwlock.writing:
+        for worker, (chunkid, _) in self.current.items():
+          chunk = self.chunks[chunkid]
+          if chunk.length > 0:
+            self._complete(chunk, worker)
+        promises = []
+        for chunk in self.chunks.values():
+          if chunk.length > 0 and chunk.uuid not in self.saved:
+            self.saved.add(chunk.uuid)
+            promises.append(self.workers.submit(chunk.save, self.directory))
+        if self.debug_save_wait:
+          [promise.result() for promise in promises]
+    return {'limiter': self.limiter.save()}
 
   @embodied.timer.section('replay_load')
   def load(self, data=None, directory=None, amount=None):
-    assert data is None
+
     directory = directory or self.directory
     amount = amount or self.capacity or np.inf
     if not directory:
@@ -377,7 +380,10 @@ class Replay:
           if chunk.succ in self.refs:
             self.refs[chunk.succ] += 1
           for index in range(amount):
-            self._insert(chunk.uuid, index)
+            self._insert(chunk.uuid, index, loading=True)
+
+    if data and 'limiter' in data:
+      self.limiter.load(data.pop('limiter'))
 
   @embodied.timer.section('complete_chunk')
   def _complete(self, chunk, worker):

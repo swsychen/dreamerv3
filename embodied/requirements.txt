@@ -1,6 +1,5 @@
 cloudpickle
 colored
-google-cloud-pubsub
 gputil
 msgpack
 numpy

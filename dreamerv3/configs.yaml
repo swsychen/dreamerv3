@@ -176,8 +176,6 @@ size400m: &size400m
   .*\.depth: 96
   .*\.units: 1536
 
-# <<<Attention>>>> the config.task need to be in the format '{suite}_{task}'
-# The task is set from CLI as `--task {suite}_{task}`, TODO, where is the following code used?
 minecraft:
   task: minecraft_diamond
   run:
@@ -192,7 +190,7 @@ dmlab:
   run:
     steps: 2.6e7
 
-atari:     
+atari:
   task: atari_pong
   env.atari.size: [96, 96]
   (enc|dec).simple.minres: 6
@@ -289,6 +287,3 @@ debug:
   .*\.layers: 2
   .*\.units: 8
   .*\.depth: 2
-  .*\.repdep: 4
-  .*\.tower.blocks: 1
-  .*\.mindepth: 2

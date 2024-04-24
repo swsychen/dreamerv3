@@ -7,11 +7,10 @@
 #
 # 2) Start training:
 #
-#   docker build -f agents/unidreamer/Dockerfile -t img . && \
+#   docker build -f dreamerv3/Dockerfile -t img . && \
 #   docker run -it --rm --gpus all -v ~/logdir/docker:/logdir img \
-#     sh -c 'ldconfig; scripts/xvfb_run.sh python agents/unidreamer/train.py \
-#       --logdir "/logdir/$(date +%Y%m%d-%H%M%S)" \
-#       --configs crafter --task crafter_reward'
+#     sh -c 'ldconfig; sh embodied/scripts/xvfb_run.sh python dreamerv3/main.py \
+#       --logdir "/logdir/{timestamp}" --configs atari --task atari_pong'
 #
 # 3) See results:
 #
@@ -31,20 +30,20 @@ RUN apt-get update && apt-get install -y \
   && apt-get clean
 
 # Workdir
-RUN mkdir /embodied
-WORKDIR /embodied
+RUN mkdir /app
+WORKDIR /app
 
 # Python
 RUN add-apt-repository ppa:deadsnakes/ppa
 RUN apt-get update && apt-get install -y python3.11-dev python3.11-venv && apt-get clean
 RUN python3.11 -m venv ./venv --upgrade-deps
-ENV PATH="/embodied/venv/bin:$PATH"
+ENV PATH="/app/venv/bin:$PATH"
 RUN pip install --upgrade pip setuptools
 
 # Envs
-COPY scripts/install-minecraft.sh .
+COPY embodied/scripts/install-minecraft.sh .
 RUN sh install-minecraft.sh
-COPY scripts/install-dmlab.sh .
+COPY embodied/scripts/install-dmlab.sh .
 RUN sh install-dmlab.sh
 RUN pip install ale_py autorom[accept-rom-license]
 RUN pip install procgen_mirror
@@ -55,15 +54,14 @@ ENV MUJOCO_GL egl
 ENV NUMBA_CACHE_DIR /tmp
 
 # Agent
-RUN mkdir -p agents/unidreamer
-COPY agents/unidreamer/requirements.txt agents/unidreamer/requirements.txt
-RUN pip install -r agents/unidreamer/requirements.txt \
+COPY dreamerv3/requirements.txt agent-requirements.txt
+RUN pip install -r agent-requirements.txt \
   -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 ENV XLA_PYTHON_CLIENT_MEM_FRACTION 0.8
 
 # Embodied
-COPY requirements.txt requirements.txt
-RUN pip install -r requirements.txt
+COPY embodied/requirements.txt embodied-requirements.txt
+RUN pip install -r embodied-requirements.txt
 
 # Source
 COPY . .

@@ -58,7 +58,9 @@ follow the manual instructions below.
 Install [JAX][jax] and then the other dependencies:
 
 ```sh
-pip install -r requirements.txt
+pip install -U -r embodied/requirements.txt
+pip install -U -r dreamerv3/requirements.txt \
+  -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 ```
 
 Simple training script:

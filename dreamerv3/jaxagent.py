@@ -86,9 +86,9 @@ class JAXAgent(embodied.Agent):
     self._lower_report()
     self._train = self._train.compile()
     self._report = self._report.compile()
-    self._stack = jax.jit(lambda xs: jax.tree_map(
+    self._stack = jax.jit(lambda xs: jax.tree.map(
           jnp.stack, xs, is_leaf=lambda x: isinstance(x, list)))
-    self._split = jax.jit(lambda xs: jax.tree_map(
+    self._split = jax.jit(lambda xs: jax.tree.map(
         lambda x: [y[0] for y in jnp.split(x, len(x))], xs))
     print('Done compiling train and report!')
 
@@ -114,7 +114,7 @@ class JAXAgent(embodied.Agent):
 
     with embodied.timer.section('prepare_carry'):
       if self.jaxcfg.fetch_policy_carry:
-        carry = jax.tree_map(
+        carry = jax.tree.map(
             np.stack, carry, is_leaf=lambda x: isinstance(x, list))
       else:
         with self.policy_lock:
@@ -143,7 +143,7 @@ class JAXAgent(embodied.Agent):
         if self.pending_sync:
           old = self.policy_params
           self.policy_params = self.pending_sync
-          jax.tree_map(lambda x: x.delete(), old)
+          jax.tree.map(lambda x: x.delete(), old)
           self.pending_sync = None
 
     with embodied.timer.section('fetch_outputs'):
@@ -183,7 +183,7 @@ class JAXAgent(embodied.Agent):
       self.pending_sync = jax.device_put(
           {k: allo[k] for k in self.policy_keys}, self.policy_mirrored)
     else:
-      jax.tree_map(lambda x: x.delete(), allo)
+      jax.tree.map(lambda x: x.delete(), allo)
 
     return_outs = {}
     if self.pending_outs:
@@ -241,8 +241,8 @@ class JAXAgent(embodied.Agent):
     with self.train_lock:
       with self.policy_lock:
         chex.assert_trees_all_equal_shapes(self.params, state)
-        jax.tree_map(lambda x: x.delete(), self.params)
-        jax.tree_map(lambda x: x.delete(), self.policy_params)
+        jax.tree.map(lambda x: x.delete(), self.params)
+        jax.tree.map(lambda x: x.delete(), self.policy_params)
         self.params = jax.device_put(state, self.train_mirrored)
         self.policy_params = jax.device_put(
             {k: self.params[k].copy() for k in self.policy_keys},
@@ -349,15 +349,15 @@ class JAXAgent(embodied.Agent):
         report, (tm, ts, ts), tm)
 
   def _take_mets(self, mets):
-    mets = jax.tree_map(lambda x: x.__array__(), mets)
+    mets = jax.tree.map(lambda x: x.__array__(), mets)
     mets = {k: v[0] for k, v in mets.items()}
-    mets = jax.tree_map(
+    mets = jax.tree.map(
         lambda x: np.float32(x) if x.dtype == jnp.bfloat16 else x, mets)
     return mets
 
   def _take_outs(self, outs):
-    outs = jax.tree_map(lambda x: x.__array__(), outs)
-    outs = jax.tree_map(
+    outs = jax.tree.map(lambda x: x.__array__(), outs)
+    outs = jax.tree.map(
         lambda x: np.float32(x) if x.dtype == jnp.bfloat16 else x, outs)
     return outs
 
