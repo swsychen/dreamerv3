@@ -110,7 +110,7 @@ class ExpandScalars(base.Wrapper):
         self._act_expanded.append(key)
       self._act_space[key] = space
 
-  @functools.cached_property
+  @functools.cached_property  # it will only compute the first time it is called, and then cache the result
   def obs_space(self):
     return self._obs_space
 

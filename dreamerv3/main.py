@@ -122,7 +122,7 @@ def make_agent(config):
   """Create an agent from the config.
 
   Args:
-      config (Config dict): the configuation dictionary
+      config (Config dict): the all configuation dictionary
 
   Returns:
       Agent/RandomAgent obj: the agent object
@@ -185,7 +185,7 @@ def make_env(config, index, **overrides):
   """Create an environment from the config.
 
   Args:
-      config (Config dict): _description_
+      config (Config dict): the all configuation dictionary
       index (_type_): _description_
 
   Returns:
@@ -226,9 +226,10 @@ def make_env(config, index, **overrides):
   env = ctor(task, **kwargs)
   return wrap_env(env, config)
 
+# TODO: need to figure out how the multi-threading works for the environment (atari and minecraft)
 
 def wrap_env(env, config):
-  args = config.wrapper
+  args = config.wrapper    # the wrapper dict will also be output as a Config object (dict)
   for name, space in env.act_space.items():
     if name == 'reset':
       continue

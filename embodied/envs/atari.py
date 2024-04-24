@@ -7,7 +7,7 @@ import numpy as np
 
 
 class Atari(embodied.Env):
-
+  
   LOCK = threading.Lock()  # defined at the class level, all instances share the same lock
   WEIGHTS = np.array([0.299, 0.587, 1 - (0.299 + 0.587)])  # weight for each RGB channel when converting to gray scale
   ACTION_MEANING = (
@@ -27,16 +27,16 @@ class Atari(embodied.Env):
         size (tuple, optional): the desire image size used for observation (will need to resize the original buffer image). Defaults to (84, 84).
         gray (bool, optional): whether to convert RGB image to grey scale when used for observation. Defaults to True.
         noops (int, optional): how many no-operation actions at the game start (to ensure a different state each time), if it is i, will do i+1 noops. Defaults to 0.
-        lives (str, optional): how to do when a life is lost, 'unused' will continue until game over, TODO'discount' will terminate and 'reset' will terminate+reset env (the last state will be marked as is_last=True). Defaults to 'unused'.
-        sticky (bool, optional): whether to use the same (last) action with a certain probability in the next action step (to simulate persistence or delay in execution, one action step may contain a number of repeated actions). Defaults to True.
+        lives (str, optional): how to do when a life is lost, 'unused' will continue until game over, 'discount' will not end the episode but simply cut the future rewards and 'reset' will terminate episode+reset env (the last state will be marked as is_last=True, of course the future reward is also cut). Defaults to 'unused'.
+        sticky (bool, optional): whether to use the same (last) action with a certain probability in the next action step (to simulate persistence or delay in execution, one action step may contain a number of repeated actions (env steps)). Defaults to True.
         actions (str, optional): action set we want to use for this game. Defaults to 'all'.
-        length (int, optional): episode duration. Defaults to 108000.
+        length (int, optional): episode max duration. Defaults to 108000.
         pooling (int, optional): maxlength of image buffer. Defaults to 2.
         aggregate (str, optional): _description_. Defaults to 'max'.
         resize (str, optional): the package used to resize original image to the size we want for observation. Defaults to 'pillow'.
         autostart (bool, optional): whether to autostart the game with "FIRE" and "UP" action after no-op actions. Defaults to False.
-        clip_reward (bool, optional): _description_. Defaults to False.
-        seed (_type_, optional): _description_. Defaults to None.
+        clip_reward (bool, optional): whether to clip all rewards using their signs (e.g. +5-->+-1, -7-->-1, 0-->0). Defaults to False.
+        seed (int, optional): assigned seed for random number generator--reproducibility. If it is None, then every run will give a different result. Defaults to None.
     """
     import ale_py
     import ale_py.roms as roms
@@ -62,7 +62,7 @@ class Atari(embodied.Env):
     self.resize = resize
     self.autostart = autostart
     self.clip_reward = clip_reward
-    self.rng = np.random.default_rng(seed)
+    self.rng = np.random.default_rng(seed)  
 
     with self.LOCK:
       self.ale = ale_py.ALEInterface()
@@ -79,15 +79,15 @@ class Atari(embodied.Env):
     self.actionset = {
         'all': self.ale.getLegalActionSet,
         'needed': self.ale.getMinimalActionSet,
-    }[actions]()
+    }[actions]()   # a list of available actions for this game
 
-    W, H = self.ale.getScreenDims()
+    W, H = self.ale.getScreenDims()  # original image size, for Pong, it is (H,W)=(160, 210)
     self.buffers = deque(
         [np.zeros((W, H, 3), np.uint8) for _ in range(self.pooling)],
         maxlen=self.pooling)
     self.prevlives = None
     self.duration = None
-    self.done = True
+    self.done = True       # trigger a beginning reset of the environment
 
   @property
   def obs_space(self):
@@ -113,11 +113,11 @@ class Atari(embodied.Env):
         action (dict): a_t-1, contain "action": scalar action index and "reset": bool flag to reset the environment
 
     Returns:
-        dict: observation dict o_t/s_t of this step with keys: image, reward, is_first, is_last, is_terminal
+        dict: observation dict o_t/s_t (assuming self.repeat=1) of this step with keys: image, reward, is_first, is_last, is_terminal
     """
     if action['reset'] or self.done:
       self._reset()
-      self.prevlives = self.ale.lives()     
+      self.prevlives = self.ale.lives()    # the beginning lives of the agent, could not be full-life if the no-operation/autostart actions result in lost life
       self.duration = 0
       self.done = False
       return self._obs(0.0, is_first=True)
@@ -127,19 +127,19 @@ class Atari(embodied.Env):
     assert 0 <= action['action'] < len(self.actionset), action['action']
     act = self.actionset[action['action']]
     for repeat in range(self.repeat):
-      reward += self.ale.act(act)
+      reward += self.ale.act(act)      # accumulate rewards for all the repeated actions
       self.duration += 1
       if repeat >= self.repeat - self.pooling: # start render when the rest steps are exactly the same as the pooling size (all the buffer will be exactly filled with the latest images)
         self._render()   # get and store the latest screen image at position 0 in the buffer
       if self.ale.game_over():    # if game over, then terminate the episode and mark the last action
         terminal = True
         last = True
-      if self.duration >= self.length:   # if the duration exceeds the set length, then terminate the episode
+      if self.duration >= self.length:   # if the duration exceeds the set maximum length, then terminate the episode
         last = True
       lives = self.ale.lives()        # current lives of the agent
-      # if lost life, then  TODO unclear WHETHER it will terminate the episode
+      # if lost life, then tell the subsequent algorithm not to consider further rewards
       if self.lives == 'discount' and 0 < lives < self.prevlives:
-        terminal = True     # not trigger env reset, not end the episode
+        terminal = True     # not trigger env reset--> not end the episode
       if self.lives == 'reset' and 0 < lives < self.prevlives:
         terminal = True
         last = True    # when self.lives == 'reset', lost life will mark the end of the action sequence. will trigger env reset and terminate the episode
@@ -152,7 +152,7 @@ class Atari(embodied.Env):
 
   def _reset(self):
     """here we reset the game, and execute random number of no-operation actions at the start, to ensure a different state each time.
-    If autostart is True, then start the game with FIRE and UP action after the no-operation actions.
+    If autostart is True, then start the game with FIRE and UP action after the no-operation actions. Lives could be reduced during the no-operation/autostart actions but we do nothing about that.
     """
     with self.LOCK:
       self.ale.reset_game()
@@ -187,11 +187,23 @@ class Atari(embodied.Env):
     self.ale.getScreenRGB(self.buffers[0])        # put the latest screen image at position 0
 
   def _obs(self, reward, is_first=False, is_last=False, is_terminal=False):
+    """Here we aggregate the buffer images to a single image and resize it to the desired size for observation.
+      Reward-clipping is optional and the image can be converted to gray scale here.
+    Args:
+        reward (float): reward of this action step (sum of the rewards of repeated actions).
+        is_first (bool, optional): the first state in an episode or not. Defaults to False.
+        is_last (bool, optional): whether this state is the end of the episode. Defaults to False.
+        is_terminal (bool, optional): whether to cut the future rewards. Defaults to False.
+
+    Returns:
+        dict: observation dict o_t/s_t of this step with keys: image, reward, is_first, is_last, is_terminal
+    """
     if self.clip_reward:
-      reward = np.sign(reward)
-    if self.aggregate == 'max':
-      image = np.amax(self.buffers, 0)
-    elif self.aggregate == 'mean':
+      reward = np.sign(reward)   # clip all rewards using their signs
+    # aggregate the buffer images to a single image
+    if self.aggregate == 'max':   # pixel-wise maximum across the buffer deque
+      image = np.amax(self.buffers, 0) 
+    elif self.aggregate == 'mean':  # pixel-wise mean across the buffer deque
       image = np.mean(self.buffers, 0).astype(np.uint8)
     # resize image to self.size
     if self.resize == 'opencv':
