@@ -34,18 +34,18 @@ def main(argv=None):
   # 1.2-- Load default config (has all needed general+model+default_env hyperparams) from `agt.Agent.configs`, which also has all other env configs.
   config = embodied.Config(agt.Agent.configs['defaults'])
 
-  # 1.3-- Update user-assigned env/task with their properties to the config
+  # 1.3-- Update user-assigned env/task with their properties to the config (in last half of the configs.yaml)
   for name in parsed.configs:
     config = config.update(agt.Agent.configs[name])
   
   # 1.4-- Update other arguments to the config
-  config = embodied.Flags(config).parse(other)
+  config = embodied.Flags(config).parse(other) # any extra positional arguments (here:config) provided during the function call are collected into a tuple named args-->(config,)
   config = config.update(
-      logdir=config.logdir.format(timestamp=embodied.timestamp()))
+      logdir=config.logdir.format(timestamp=embodied.timestamp()))   # if logdif has placeholder {timestamp}, replace it with current timestamp
   
   # 1.5-- Extract a runtime config from the config
   args = embodied.Config(
-      **config.run,
+      **config.run,       # **config.run will into kwargs. If using config.run, it will into args as a tuple, but results (the combined dict) are same
       logdir=config.logdir,
       batch_size=config.batch_size,
       batch_length=config.batch_length,
@@ -56,19 +56,19 @@ def main(argv=None):
 
   # 1.6-- Create a LocalPath/GPath object from the logdir for managing path-related operations
   logdir = embodied.Path(args.logdir)
-  if args.script not in ('env', 'replay'):
+  if args.script not in ('env', 'replay'):    # if script is 'train' or 'train_xxx' ..., create new dir and save the config in the dir
     logdir.mkdir()
     config.save(logdir / 'config.yaml')
 
   # TODO: timer and multiprocessing
   def init():
     embodied.timer.global_timer.enabled = args.timer
-  embodied.distr.Process.initializers.append(init)
+  embodied.distr.Process.initializers.append(init)    # add to the class definition
   init()
 
   if args.script == 'train':
     embodied.run.train(
-        bind(make_agent, config),
+        bind(make_agent, config),      #the first argument is pre-filled with config
         bind(make_replay, config, 'replay'),
         bind(make_env, config),
         bind(make_logger, config), args)
@@ -129,12 +129,12 @@ def make_agent(config):
       Agent/RandomAgent obj: the agent object
   """
   from . import agent as agt
-  env = make_env(config, 0)
+  env = make_env(config, 0)        # the env here is mainly used to get the obs_space and act_space for agent init
   if config.random_agent:
     agent = embodied.RandomAgent(env.obs_space, env.act_space)
   else:
     agent = agt.Agent(env.obs_space, env.act_space, config)
-  env.close()
+  env.close()           # the close() is undefined (just a pass) in the class
   return agent
 
 
@@ -187,10 +187,10 @@ def make_env(config, index, **overrides):
 
   Args:
       config (Config dict): the all configuation dictionary
-      index (_type_): _description_
+      index (int): the index of the environment, unique
 
   Returns:
-      _type_: _description_
+      obj: a mutli-wrapped environment object
   """
   suite, task = config.task.split('_', 1)   # the config.task need to be in the format '{suite}_{task}'
   if suite == 'memmaze':
@@ -230,19 +230,31 @@ def make_env(config, index, **overrides):
 # TODO: need to figure out how the multi-threading works for the environment (atari and minecraft)
 
 def wrap_env(env, config):
+  """wrapper for the environment, handle normlization, discretization, checking (including obs space) and other operations of the action space.
+  This function will be called around env.step() in each sub-wrapper.
+
+  {wrapper1 {wrapper2 {wrapper3 {env}}}}, outer wrapper.step() will go inside to the inner wrapper's .step() and finally to the env's .step()
+
+  Args:
+      env (obj): the environment object
+      config (Config dict): the all configuation dictionary
+
+  Returns:
+      obj: the wrapped environment object
+  """
   args = config.wrapper        # the wrapper dict will also be output as a Config object (dict)
   for name, space in env.act_space.items():
     if name == 'reset':
       continue
-    elif not space.discrete:
-      env = wrappers.NormalizeAction(env, name)
-      if args.discretize:
+    elif not space.discrete:      # if the env action space is continuous
+      env = wrappers.NormalizeAction(env, name)      # normalize the action
+      if args.discretize:         # if we want the continuous action to be discretized
         env = wrappers.DiscretizeAction(env, name, args.discretize)
-  env = wrappers.ExpandScalars(env)
-  if args.length:
+  env = wrappers.ExpandScalars(env)  
+  if args.length:        # if the length has a value---manually control the episode length
     env = wrappers.TimeLimit(env, args.length, args.reset)
   if args.checks:
-    env = wrappers.CheckSpaces(env)
+    env = wrappers.CheckSpaces(env)   # wrapper to check action and obs values are within their space
   for name, space in env.act_space.items():
     if not space.discrete:
       env = wrappers.ClipAction(env, name)

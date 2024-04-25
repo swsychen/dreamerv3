@@ -69,6 +69,13 @@ class Until:
 class Clock:
 
   def __init__(self, every, first=True):
+    """a clock signal that triggers every `every` seconds, will return True on the first call if `first` is True.
+    It return True if the time since the last trigger is greater than or equal to `every` seconds.
+
+    Args:
+        every (float): time in seconds between triggers.
+        first (bool, optional): whether to trigger in the first call. Defaults to True.
+    """
     self._every = every
     self._prev = None
     self._first = first

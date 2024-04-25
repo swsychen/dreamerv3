@@ -10,6 +10,13 @@ from . import space as spacelib
 class TimeLimit(base.Wrapper):
 
   def __init__(self, env, duration, reset=True):
+    """A wrapper for limiting the duration of an episode, mostly for debug, setting a short duration to test the agent
+
+    Args:
+        env (obj): the environment to be wrapped
+        duration (float,optional): the duration of the episode
+        reset (bool, optional): whether to trigger env reset after the timelimit. Defaults to True.
+    """
     super().__init__(env)
     self._duration = duration
     self._reset = reset
@@ -21,32 +28,38 @@ class TimeLimit(base.Wrapper):
       self._step = 0
       self._done = False
       if self._reset:
-        action.update(reset=True)
+        action.update(reset=True)      # reset the environment
         return self.env.step(action)
       else:
-        action.update(reset=False)
+        action.update(reset=False)    # continue the episode
         obs = self.env.step(action)
-        obs['is_first'] = True
+        obs['is_first'] = True     # but mark current obs as the first step
         return obs
     self._step += 1
     obs = self.env.step(action)
     if self._duration and self._step >= self._duration:
-      obs['is_last'] = True
-    self._done = obs['is_last']
+      obs['is_last'] = True       # mark the current obs as the last step of the episode when the duration is reached
+    self._done = obs['is_last']   # update the exceeding flag 
     return obs
 
 
 class ActionRepeat(base.Wrapper):
 
   def __init__(self, env, repeat):
+    """Env wrapper to repeat the action for multiple steps. Cannot be used when env itself has explicit action repeat code, otherwsie may cause duplicate repeat action.
+
+    Args:
+        env (obj): the environment to be wrapped
+        repeat (int): the number of steps to repeat the action
+    """
     super().__init__(env)
     self._repeat = repeat
 
   def step(self, action):
-    if action['reset']:
+    if action['reset']:   # no need to repeat the action for reset
       return self.env.step(action)
     reward = 0.0
-    for _ in range(self._repeat):
+    for _ in range(self._repeat):    # repeat the action for multiple steps and accumulate the reward
       obs = self.env.step(action)
       reward += obs['reward']
       if obs['is_last'] or obs['is_terminal']:
@@ -58,6 +71,14 @@ class ActionRepeat(base.Wrapper):
 class ClipAction(base.Wrapper):
 
   def __init__(self, env, key='action', low=-1, high=1):
+    """action clipping wrapper
+
+    Args:
+        env (obj): environment to be wrapped
+        key (str, optional): the key in action dict that needs to be clipped. Defaults to 'action'.
+        low (int, optional): clipping lower bound. Defaults to -1.
+        high (int, optional): clipping higher bound. Defaults to 1.
+    """
     super().__init__(env)
     self._key = key
     self._low = low
@@ -65,39 +86,57 @@ class ClipAction(base.Wrapper):
 
   def step(self, action):
     clipped = np.clip(action[self._key], self._low, self._high)
-    return self.env.step({**action, self._key: clipped})
+    return self.env.step({**action, self._key: clipped})  # update the action value in the action dict (if self._key is 'action', it will overwrite the original action value; otherwise, it will add a new key-value pair)
 
 
 class NormalizeAction(base.Wrapper):
 
   def __init__(self, env, key='action'):
+    """wrapper for normalized action, it assume normalized action (in finite action space case) is within [-1, 1], 
+    will scale the action to the original space for input to the environment. 
+    For infinite bound case, normalized and unnormalized action will be the same value. Normalized/unnormlized act_space in this case are both defined to [-1,1].
+
+    Args:
+        env (obj): the environment to be wrapped
+        key (str, optional): the action key. Defaults to 'action'.
+    """
     super().__init__(env)
     self._key = key
     self._space = env.act_space[key]
-    self._mask = np.isfinite(self._space.low) & np.isfinite(self._space.high)
-    self._low = np.where(self._mask, self._space.low, -1)
+    self._mask = np.isfinite(self._space.low) & np.isfinite(self._space.high) # check if the space bounds are finite
+    # the original space bounds 
+    self._low = np.where(self._mask, self._space.low, -1)         # use the space bounds if they are finite, otherwise use -1 / 1
     self._high = np.where(self._mask, self._space.high, 1)
 
   @functools.cached_property
   def act_space(self):
-    low = np.where(self._mask, -np.ones_like(self._low), self._low)
+    # set the low and high bounds of the normalized action space to [-1, 1] regardless of whether finite, 
+    # because if infinite, the self._mask will all false while self._low and self._high will already be -1 / 1 during init
+    low = np.where(self._mask, -np.ones_like(self._low), self._low)  
     high = np.where(self._mask, np.ones_like(self._low), self._high)
     space = spacelib.Space(np.float32, self._space.shape, low, high)
     return {**self.env.act_space, self._key: space}
 
   def step(self, action):
+    # rescale the normalized action value to the original space for input to the environment
     orig = (action[self._key] + 1) / 2 * (self._high - self._low) + self._low
     orig = np.where(self._mask, orig, action[self._key])
-    return self.env.step({**action, self._key: orig})
+    return self.env.step({**action, self._key: orig})  # update the action value with original (unnormalized) value in the action dict
 
 
 class ExpandScalars(base.Wrapper):
 
   def __init__(self, env):
+    """Wrapper of env, to expand the scalar + continuous spaces to have a shape of (1,)
+
+    Args:
+        env (obj): the environment to be wrapped
+    """
     super().__init__(env)
-    self._obs_expanded = []
+    self._obs_expanded = []    # record which keys are expanded
     self._obs_space = {}
     for key, space in self.env.obs_space.items():
+      # expand the scalar + continuous spaces to have a shape of (1,)
       if space.shape == () and key != 'reward' and not space.discrete:
         space = spacelib.Space(space.dtype, (1,), space.low, space.high)
         self._obs_expanded.append(key)
@@ -105,6 +144,7 @@ class ExpandScalars(base.Wrapper):
     self._act_expanded = []
     self._act_space = {}
     for key, space in self.env.act_space.items():
+      # expand the scalar + continuous spaces to have a shape of (1,)
       if space.shape == () and not space.discrete:
         space = spacelib.Space(space.dtype, (1,), space.low, space.high)
         self._act_expanded.append(key)
@@ -119,8 +159,16 @@ class ExpandScalars(base.Wrapper):
     return self._act_space
 
   def step(self, action):
+    """TODO: unknown the purpose of np.squeeze and np.expand_dims
+
+    Args:
+        action (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
     action = {
-        key: np.squeeze(value, 0) if key in self._act_expanded else value
+        key: np.squeeze(value, 0) if key in self._act_expanded else value  
         for key, value in action.items()}
     obs = self.env.step(action)
     obs = {
@@ -226,6 +274,11 @@ class ForceDtypes(base.Wrapper):
 class CheckSpaces(base.Wrapper):
 
   def __init__(self, env):
+    """wrapper for checking the value of the observation and action is of valid type and within the space
+
+    Args:
+        env (obj): the environment to be wrapped
+    """
     super().__init__(env)
 
   def step(self, action):

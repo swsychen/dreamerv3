@@ -14,11 +14,20 @@ class DMC(embodied.Env):
 
   def __init__(
       self, env, repeat=1, size=(64, 64), image=True, camera=-1):
+    """Wrapper for DeepMind Control Suite.
+
+    Args:
+        env (str): {domain}_{task} under DMC e.g. "walker_walk".
+        repeat (int, optional):action repeat number. Defaults to 1.
+        size (tuple, optional): observation image size. Defaults to (64, 64).
+        image (bool, optional): train using vision or prorio. Defaults to True.
+        camera (int, optional): camera view type, -1 will choose default view according to domain. Defaults to -1.
+    """
     if 'MUJOCO_GL' not in os.environ:
       os.environ['MUJOCO_GL'] = 'egl'
     if isinstance(env, str):
       domain, task = env.split('_', 1)
-      if camera == -1:
+      if camera == -1:           # camera view type, as listed below  
         camera = self.DEFAULT_CAMERAS.get(domain, 0)
       if domain == 'cup':  # Only domain with multiple words.
         domain = 'ball_in_cup'
@@ -39,7 +48,7 @@ class DMC(embodied.Env):
     from . import from_dm
     self._env = from_dm.FromDM(self._dmenv)
     self._env = embodied.wrappers.ExpandScalars(self._env)
-    self._env = embodied.wrappers.ActionRepeat(self._env, repeat)
+    self._env = embodied.wrappers.ActionRepeat(self._env, repeat) # Wrapper to repeat actions, unlike Atari which explicitly codes for action repeat
     self._size = size
     self._image = image
     self._camera = camera

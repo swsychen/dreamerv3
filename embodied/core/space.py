@@ -60,6 +60,12 @@ class Space:
     return classes
 
   def __repr__(self):
+    """define how instances of that class should be represented as a string
+    , especially useful for debugging purposes.
+
+    Returns:
+        tuple: tuple of strings, describing the space
+    """
     low = None if self.low is None else self.low.min()
     high = None if self.high is None else self.high.min()
     return (
@@ -69,9 +75,17 @@ class Space:
         f'high={high})')
 
   def __contains__(self, value):
-    value = np.asarray(value)
+    """check if a value is within the space, including the shape, dtype, and within bounds
+
+    Args:
+        value (optional): the value to be checked
+
+    Returns:
+        bool: if the value is within the space or not
+    """
+    value = np.asarray(value)     # convert value to an np ndarray
     if np.issubdtype(self.dtype, str):
-      return np.issubdtype(value.dtype, str)
+      return np.issubdtype(value.dtype, str)  # if it is string, no need to check the shape and bounds
     if value.shape != self.shape:
       return False
     if (value > self.high).any():

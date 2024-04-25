@@ -239,7 +239,7 @@ class SimpleEncoder(nj.Module):
     self.imgkeys = [k for k, s in spaces.items() if len(s.shape) == 3]
     self.vecinp = Input(self.veckeys, featdims=1)
     self.imginp = Input(self.imgkeys, featdims=3)
-    self.depths = tuple(self.depth * mult for mult in self.mults)
+    self.depths = tuple(self.depth * mult for mult in self.mults)  # output channel dim of each conv layer
     self.kw = kw
 
   def __call__(self, data, bdims=2):
@@ -259,7 +259,7 @@ class SimpleEncoder(nj.Module):
       print('ENC')
       x = self.imginp(data, bdims, jaxutils.COMPUTE_DTYPE) - 0.5
       x = x.reshape((-1, *x.shape[bdims:]))
-      for i, depth in enumerate(self.depths):
+      for i, depth in enumerate(self.depths):   
         stride = 1 if self.debug_outer and i == 0 else 2
         x = self.get(f'conv{i}', Conv2D, depth, self.kernel, stride, **kw)(x)
       assert x.shape[-3] == x.shape[-2] == self.minres, x.shape

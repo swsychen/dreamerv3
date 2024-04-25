@@ -175,7 +175,8 @@ size400m: &size400m
   dyn.rssm: {deter: 12288, hidden: 1536, classes: 96}
   .*\.depth: 96
   .*\.units: 1536
-
+# <<<Attention>>>> the config.task need to be in the format '{suite}_{task}'
+# The task is set from CLI as `--task {suite}_{task}`
 minecraft:
   task: minecraft_diamond
   run:

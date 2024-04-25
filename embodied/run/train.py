@@ -34,7 +34,7 @@ def train(make_agent, make_replay, make_env, make_logger, args):
   batch_steps = args.batch_size * (args.batch_length - args.replay_context)
   should_expl = embodied.when.Until(args.expl_until)
   should_train = embodied.when.Ratio(args.train_ratio / batch_steps)
-  should_log = embodied.when.Clock(args.log_every)
+  should_log = embodied.when.Clock(args.log_every)    # a Clock trigger that return True if it reaches a time interval
   should_eval = embodied.when.Clock(args.eval_every)
   should_save = embodied.when.Clock(args.save_every)
 
