@@ -18,6 +18,21 @@ class Replay:
       self, length, capacity=None, directory=None, chunksize=1024, min_size=1,
       samples_per_insert=None, tolerance=1e4, online=False, selector=None,
       debug_save_wait=False, seed=0):
+    """Wrapper for a replay buffer
+
+    Args:
+        length (int): batch length
+        capacity (int, optional): max number of chunks. Defaults to None.
+        directory (Path obj, optional): manager for replay directory. Defaults to None.
+        chunksize (int, optional): _description_. Defaults to 1024.
+        min_size (int, optional): _description_. Defaults to 1.
+        samples_per_insert (_type_, optional): _description_. Defaults to None.
+        tolerance (_type_, optional): _description_. Defaults to 1e4.
+        online (bool, optional): _description_. Defaults to False.
+        selector (_type_, optional): _description_. Defaults to None.
+        debug_save_wait (bool, optional): _description_. Defaults to False.
+        seed (int, optional): _description_. Defaults to 0.
+    """
     assert not capacity or min_size <= capacity
 
     self.length = length

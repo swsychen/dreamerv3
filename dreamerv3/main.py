@@ -154,15 +154,27 @@ def make_logger(config):
 
 
 def make_replay(config, directory=None, is_eval=False, rate_limit=False):
-  directory = directory and embodied.Path(config.logdir) / directory
+  """Create a replay buffer from the config.
+  TODO: replay ratio implementation, how action repeat is calculated in batch length, is it seperate?
+  
+  Args:
+      config (Config dict): the all configuation dictionary
+      directory (str, optional): name of the replay directory (TODO: probably for storing). Defaults to None.
+      is_eval (bool, optional): whether the replay buffer is for evaluation. Defaults to False.
+      rate_limit (bool, optional): _description_. Defaults to False.
+
+  Returns:
+      _type_: _description_
+  """
+  directory = directory and embodied.Path(config.logdir) / directory   # x and y returns x if x is falsy (e.g., 0, False, None, empty string, etc.); otherwise, it returns y.                    
   size = int(config.replay.size / 10 if is_eval else config.replay.size)
-  length = config.batch_length
+  length = config.batch_length          # the length of a batch
   kwargs = {}
   kwargs['online'] = config.replay.online
   if rate_limit and config.run.train_ratio > 0:
     kwargs['samples_per_insert'] = config.run.train_ratio / (
         length - config.replay_context)
-    kwargs['tolerance'] = 5 * config.batch_size
+    kwargs['tolerance'] = 5 * config.batch_size          # TODO: need to check the purpose of these three hyperparameters
     kwargs['min_size'] = min(
         max(config.batch_size, config.run.train_fill), size)
   selectors = embodied.replay.selectors
