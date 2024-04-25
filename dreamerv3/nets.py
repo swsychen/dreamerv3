@@ -259,7 +259,7 @@ class SimpleEncoder(nj.Module):
       print('ENC')
       x = self.imginp(data, bdims, jaxutils.COMPUTE_DTYPE) - 0.5
       x = x.reshape((-1, *x.shape[bdims:]))
-      for i, depth in enumerate(self.depths):   
+      for i, depth in enumerate(self.depths):
         stride = 1 if self.debug_outer and i == 0 else 2
         x = self.get(f'conv{i}', Conv2D, depth, self.kernel, stride, **kw)(x)
       assert x.shape[-3] == x.shape[-2] == self.minres, x.shape

@@ -48,6 +48,8 @@ increases data efficiency.
 
 # Instructions
 
+The code has been tested on Linux and Mac.
+
 ## Docker
 
 You can either use the provided `Dockerfile` that contains instructions or
@@ -73,10 +75,13 @@ Flexible training script:
 
 ```sh
 python dreamerv3/main.py \
-  --logdir ~/logdir/$(date "+%Y%m%d-%H%M%S") \
+  --logdir ~/logdir/{timestamp} \
   --configs crafter \
   --run.train_ratio 32
 ```
+
+To reproduce results, train on the desired task using the corresponding config,
+such as `--configs atari --task atari_pong`.
 
 # Tips
 
